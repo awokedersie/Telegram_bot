@@ -14,8 +14,11 @@ from telegram import Update
 from main import setup_application
 from database import DatabaseManager
 
-# Load environment
-load_dotenv()
+# Absolute path for PythonAnywhere
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+
+# Load environment using absolute path
+load_dotenv(os.path.join(BASE_DIR, '.env'))
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 # Initialize Telegram application for webhooks
