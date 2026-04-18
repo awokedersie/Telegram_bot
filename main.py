@@ -440,34 +440,34 @@ async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def ignore_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.callback_query.answer()
 
-if __name__ == '__main__':
-    if sys.platform == 'win32':
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+def setup_application(token):
+    """Initializes the application and registers all handlers."""
+    application = ApplicationBuilder().token(token).job_queue(None).build()
 
+    # Base Commands
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("quiz", quiz))
+    application.add_handler(CommandHandler("leaderboard", leaderboard))
+    application.add_handler(CommandHandler("history", history))
+    
+    # Callback Handlers
+    application.add_handler(CallbackQueryHandler(handle_subject, pattern="^subj_"))
+    application.add_handler(CallbackQueryHandler(handle_chapter, pattern="^chap_"))
+    application.add_handler(CallbackQueryHandler(handle_nav, pattern="^nav_"))
+    application.add_handler(CallbackQueryHandler(handle_answer, pattern="^ans_"))
+    application.add_handler(CallbackQueryHandler(handle_actions, pattern="^action_"))
+    application.add_handler(CallbackQueryHandler(ignore_callback, pattern="^ignore$"))
+    
+    return application
+
+if __name__ == '__main__':
     if not TOKEN or TOKEN == "YOUR_TOKEN_HERE":
         print("Please set your TELEGRAM_BOT_TOKEN in the .env file")
         exit(1)
 
-    app = ApplicationBuilder().token(TOKEN).job_queue(None).build()
-
-    # Handlers Registration
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("quiz", quiz))
-    app.add_handler(CommandHandler("leaderboard", leaderboard))
-    app.add_handler(CommandHandler("history", history))
-    
-    # Callback Handlers (Routed by Pattern)
-    app.add_handler(CallbackQueryHandler(handle_subject, pattern="^subj_"))
-    app.add_handler(CallbackQueryHandler(handle_chapter, pattern="^chap_"))
-    app.add_handler(CallbackQueryHandler(handle_nav, pattern="^nav_"))
-    app.add_handler(CallbackQueryHandler(handle_answer, pattern="^ans_"))
-    app.add_handler(CallbackQueryHandler(handle_actions, pattern="^action_"))
-    app.add_handler(CallbackQueryHandler(ignore_callback, pattern="^ignore$"))
-
-    print("Bot is running...")
-    app.run_polling()
+    if sys.platform == 'win32':
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        
+    application = setup_application(TOKEN)
+    print("Bot is running in POLLING mode...")
+    application.run_polling()

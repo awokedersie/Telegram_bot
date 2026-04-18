@@ -9,10 +9,17 @@ from dotenv import load_dotenv
 import zipfile
 import re
 from PyPDF2 import PdfReader
+import asyncio
+from telegram import Update
+from main import setup_application
 from database import DatabaseManager
 
 # Load environment
 load_dotenv()
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+
+# Initialize Telegram application for webhooks
+tg_app = setup_application(TOKEN) if TOKEN else None
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
@@ -275,6 +282,27 @@ def delete_chapter_api(subject, chapter):
     if db.delete_chapter(subject, chapter):
         return jsonify({"message": f"Chapter '{chapter}' deleted successfully."})
     return jsonify({"error": "Chapter not found"}), 404
+
+@app.route('/webhook/' + (TOKEN if TOKEN else 'error'), methods=['POST'])
+def webhook():
+    """Endpoint for Telegram Webhook updates."""
+    if not tg_app:
+        return "Bot not initialized", 500
+        
+    try:
+        data = request.get_json(force=True)
+        update = Update.de_json(data, tg_app.bot)
+        
+        # Process the update asynchronously
+        async def process():
+            async with tg_app:
+                await tg_app.process_update(update)
+                
+        asyncio.run(process())
+        return "OK", 200
+    except Exception as e:
+        print(f"Webhook error: {e}")
+        return "Internal Error", 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
