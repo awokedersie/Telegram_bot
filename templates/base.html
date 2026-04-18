@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Bot Admin Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    {% if current_user.is_authenticated %}
+    <div class="app-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">QuizBot <span>Admin</span></div>
+            
+            <nav class="nav-menu">
+                <a href="{{ url_for('index') }}" class="nav-item active">
+                    <span class="icon">📊</span> Dashboard
+                </a>
+                <a href="#upload-section" class="nav-item">
+                    <span class="icon">✨</span> Generate New
+                </a>
+                <a href="#questions-manager" class="nav-item">
+                    <span class="icon">📚</span> Question Manager
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <a href="{{ url_for('logout') }}" class="btn-logout" style="display: flex; align-items: center; gap: 8px; text-decoration: none; font-size: 0.9rem;">
+                    <span>🚪</span> Logout
+                </a>
+            </div>
+        </aside>
+
+        <!-- Main Wrapper -->
+        <div class="main-wrapper">
+            <header class="topbar">
+                <div class="page-title">Dashboard Overview</div>
+                <div class="user-status" style="display: flex; align-items: center; gap: 10px; font-size: 0.9rem; color: var(--text-muted);">
+                    <span style="width: 8px; height: 8px; background: var(--accent); border-radius: 50%;"></span>
+                    Active Session: {{ current_user.id }}
+                </div>
+            </header>
+            
+            <main class="content-area">
+                <div class="container">
+                    {% block content %}{% endblock %}
+                </div>
+            </main>
+        </div>
+    </div>
+    {% else %}
+    <main class="login-centered">
+        {% block login_content %}{% endblock %}
+    </main>
+    {% endif %}
+</body>
+</html>

@@ -1,0 +1,16 @@
+# Environments
+.env
+
+# Dependencies & Cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Database
+quiz.db
+
+# File Uploads
+uploads/
+Distributed_system/
+Machin_learning/
+Security_assurance/

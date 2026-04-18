@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Page Header -->
+<div style="margin-bottom: 32px;">
+    <h1 style="font-size: 1.8rem; margin-bottom: 8px;">Welcome back, Admin 👋</h1>
+    <p style="color: var(--text-muted);">Manage your subjects, generate questions, and monitor system performance.</p>
+</div>
+
+<!-- Stats Overview -->
+<div class="stats-row">
+    <div class="s-card">
+        <div class="s-label">Total Questions</div>
+        <div class="s-value">{{ total_questions }}</div>
+    </div>
+    <div class="s-card">
+        <div class="s-label">Registered Subjects</div>
+        <div class="s-value">{{ subjects|length }}</div>
+    </div>
+    <div class="s-card">
+        <div class="s-label">AI Status</div>
+        <div class="s-value" style="color: var(--accent); font-size: 1.2rem;">Ready to Generate</div>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 400px; gap: 32px; align-items: start;">
+    <!-- Generation Section -->
+    <section class="card" id="upload-section">
+        <h2 style="margin-bottom: 20px; font-size: 1.2rem;">✨ Generate New Questions</h2>
+        <form id="uploadForm" enctype="multipart/form-data">
+            <div class="form-group">
+                <label>Upload Source Document (PDF or PPTX)</label>
+                <input type="file" name="file" accept=".pdf,.pptx" required id="fileInput">
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div class="form-group">
+                    <label>Target Subject</label>
+                    <select name="subject_selection" id="subjectSelect" onchange="toggleNewSubject(this.value)">
+                        <option value="_new">-- Create New Subject --</option>
+                        {% for subject, icon in subjects %}
+                        <option value="{{ subject }}">{{ icon }} {{ subject|title }}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="text" name="new_subject_name" id="newSubjectInput" placeholder="e.g. Machine Learning" style="margin-top: 10px;">
+                </div>
+                <div class="form-group">
+                    <label>Batch Size</label>
+                    <select name="num_questions">
+                        <option value="20" selected>20 Questions</option>
+                        <option value="30">30 Questions</option>
+                        <option value="50">50 Questions</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Chapter Name (Mandatory)</label>
+                <input type="text" name="chapter_name" placeholder="e.g. Chapter 1: Optimization" required>
+            </div>
+            
+            <button type="submit" class="btn btn-primary" id="submitBtn" style="width: 100%; padding: 14px;">
+                🚀 Start Generation
+            </button>
+        </form>
+    </section>
+
+    <!-- Project Info Card -->
+    <div class="card" style="background: #f8fafc; border-style: dashed;">
+        <h3 style="font-size: 1rem; margin-bottom: 12px;">Pro Tips 💡</h3>
+        <ul style="color: var(--text-muted); font-size: 0.9rem; padding-left: 18px; line-height: 1.8;">
+            <li>Use PDF files for better extraction quality.</li>
+            <li>Ensure the chapter name is descriptive for students.</li>
+            <li>Creating a new subject automatically assigns a bot icon.</li>
+            <li>You can review all generated questions in the manager below.</li>
+        </ul>
+    </div >
+</div>
+
+<section class="card" id="questions-manager" style="margin-top: 32px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <div>
+            <h2 style="font-size: 1.2rem;">📚 Questions Manager</h2>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">Browse, review, and delete Subject/Chapter content.</p>
+        </div>
+    </div>
+    
+    <div class="manager-grid">
+        <!-- Sidebar -->
+        <div class="m-sidebar">
+            <h4 style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.05em;">Your Repository</h4>
+            <div id="subjectSidebar">
+                <p style="color: var(--text-muted); font-size: 0.85rem; padding: 10px;">Loading repository...</p>
+            </div>
+        </div>
+
+        <!-- Content Area -->
+        <div class="viewer-content">
+            <div id="questionsContainer">
+                <div style="text-align: center; padding: 60px; color: var(--text-muted);">
+                    <div style="font-size: 3.5rem; margin-bottom: 24px; opacity: 0.5;">📖</div>
+                    <h3 style="color: var(--text-main);">Repository Explorer</h3>
+                    <p>Select a subject and chapter from the left to explore and manage your quiz contents.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner"></div>
+    <h2 id="loadingText" style="color: var(--primary);">Writing Questions...</h2>
+    <p style="color: var(--text-muted); margin-top: 10px; font-weight: 500;">Gemini AI is analyzing your documents. This may take up to 60 seconds.</p>
+</div>
+
+<!-- Toast Container -->
+<div id="toastContainer" class="toast-container"></div>
+
+<script>
+    function showToast(title, message, type = 'success') {
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        
+        const icon = type === 'success' ? '✅' : '❌';
+        
+        toast.innerHTML = `
+            <div style="font-size: 1.5rem;">${icon}</div>
+            <div class="toast-content">
+                <h4>${title}</h4>
+                <p>${message}</p>
+            </div>
+        `;
+        
+        container.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.style.animation = 'slideOut 0.3s ease forwards';
+            setTimeout(() => toast.remove(), 300);
+        }, 5000);
+    }
+
+    function toggleNewSubject(val) {
+        const input = document.getElementById('newSubjectInput');
+        if (val === '_new') {
+            input.style.display = 'block';
+            input.required = true;
+        } else {
+            input.style.display = 'none';
+            input.required = false;
+        }
+    }
+
+    // Initialize
+    toggleNewSubject(document.getElementById('subjectSelect').value);
+
+    document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const submitBtn = document.getElementById('submitBtn');
+        const overlay = document.getElementById('loadingOverlay');
+        
+        overlay.style.display = 'flex';
+        submitBtn.disabled = true;
+        
+        try {
+            const response = await fetch('/upload', { method: 'POST', body: formData });
+            const result = await response.json();
+            
+            if (response.ok) {
+                showToast('Generation Successful', result.message, 'success');
+                setTimeout(() => location.reload(), 2000);
+            } else {
+                showToast('Generation Failed', result.error || 'Upload failed', 'error');
+            }
+        } catch (error) {
+            showToast('System Error', error.message, 'error');
+        } finally {
+            overlay.style.display = 'none';
+            submitBtn.disabled = false;
+        }
+    });
+
+    // --- Manager Logic ---
+
+    async function loadSidebar() {
+        const sidebar = document.getElementById('subjectSidebar');
+        try {
+            const response = await fetch('/api/subjects');
+            const subjects = await response.json();
+            
+            sidebar.innerHTML = '';
+            subjects.forEach(subj => {
+                // Create Item Container
+                const item = document.createElement('div');
+                item.className = 'm-item';
+                
+                const labelDiv = document.createElement('div');
+                labelDiv.style = "display: flex; align-items: center; gap: 10px;";
+                labelDiv.innerHTML = `<span>${subj.icon}</span> <span>${subj.name.charAt(0).toUpperCase() + subj.name.slice(1)}</span>`;
+                
+                const subDelIcon = document.createElement('span');
+                subDelIcon.className = 'delete-icon';
+                subDelIcon.title = 'Delete Subject';
+                subDelIcon.innerHTML = '🗑️';
+                subDelIcon.onclick = (e) => deleteSubject(e, subj.name);
+                
+                item.appendChild(labelDiv);
+                item.appendChild(subDelIcon);
+                
+                const chapList = document.createElement('div');
+                chapList.className = 'm-chapter-list';
+                
+                subj.chapters.forEach(chap => {
+                    const chapItem = document.createElement('div');
+                    chapItem.className = 'chapter-btn';
+                    
+                    const chapLabel = document.createElement('span');
+                    chapLabel.textContent = chap;
+                    
+                    const chapDelIcon = document.createElement('span');
+                    chapDelIcon.className = 'delete-icon';
+                    chapDelIcon.title = 'Delete Chapter';
+                    chapDelIcon.innerHTML = '❌';
+                    chapDelIcon.onclick = (e) => deleteChapter(e, subj.name, chap);
+                    
+                    chapItem.appendChild(chapLabel);
+                    chapItem.appendChild(chapDelIcon);
+                    
+                    chapItem.onclick = (e) => {
+                        e.stopPropagation();
+                        document.querySelectorAll('.chapter-btn').forEach(el => el.classList.remove('active'));
+                        chapItem.classList.add('active');
+                        loadQuestions(subj.name, chap);
+                    };
+                    chapList.appendChild(chapItem);
+                });
+                
+                item.onclick = (e) => {
+                    if (e.target.classList.contains('delete-icon')) return;
+                    item.classList.toggle('expanded');
+                    document.querySelectorAll('.m-item').forEach(el => el.classList.remove('active'));
+                    item.classList.add('active');
+                };
+                
+                sidebar.appendChild(item);
+                sidebar.appendChild(chapList);
+            });
+        } catch (error) {
+            sidebar.innerHTML = '<p style="color: var(--error); font-size: 0.8rem;">Failure: ' + error.message + '</p>';
+        }
+    }
+
+    async function deleteSubject(event, name) {
+        event.stopPropagation();
+        if (!confirm(`CAUTION: Delete "${name}" and ALL its chapters/questions? This cannot be undone.`)) return;
+        
+        try {
+            const response = await fetch(`/api/subject/delete/${name}`, { method: 'DELETE' });
+            if (response.ok) {
+                showToast('Subject Deleted', `Successfully removed ${name}.`, 'success');
+                loadSidebar();
+            } else {
+                const err = await response.json();
+                showToast('Deletion Failed', err.error, 'error');
+            }
+        } catch (e) { showToast('Error', e.message, 'error'); }
+    }
+
+    async function deleteChapter(event, subject, chapter) {
+        event.stopPropagation();
+        if (!confirm(`Delete chapter "${chapter}"?`)) return;
+        
+        try {
+            const response = await fetch(`/api/chapter/delete/${subject}/${encodeURIComponent(chapter)}`, { method: 'DELETE' });
+            if (response.ok) {
+                showToast('Chapter Deleted', `Successfully removed ${chapter}.`, 'success');
+                loadSidebar();
+                document.getElementById('questionsContainer').innerHTML = '<div style="text-align: center; padding: 60px; color: var(--text-muted);"><div style="font-size: 3.5rem; margin-bottom: 24px; opacity: 0.5;">📖</div><h3 style="color: var(--text-main);">Repository Explorer</h3><p>Select another subject and chapter to explore.</p></div>';
+            } else {
+                showToast('Deletion Failed', 'Server error.', 'error');
+            }
+        } catch (e) { showToast('Error', e.message, 'error'); }
+    }
+
+    async function loadQuestions(subject, chapter) {
+        const container = document.getElementById('questionsContainer');
+        container.innerHTML = '<div style="text-align: center; padding: 40px;">⏳ Loading content...</div>';
+        
+        try {
+            const response = await fetch(`/api/questions/${subject}/${encodeURIComponent(chapter)}`);
+            const questions = await response.json();
+            
+            container.innerHTML = `
+                <div style="margin-bottom: 24px; border-bottom: 2px solid var(--bg-main); padding-bottom: 12px;">
+                    <h3 style="color: var(--primary); font-size: 1.1rem;">${subject.toUpperCase()}</h3>
+                    <p style="font-size: 0.9rem; color: var(--text-muted);">${chapter}</p>
+                </div>
+            `;
+            
+            questions.forEach(q => {
+                const b = document.createElement('div');
+                b.className = 'bubble';
+                const letters = ['A', 'B', 'C', 'D'];
+                let opts = '';
+                q.options.forEach((o, i) => {
+                    const isCorrect = letters[i] === q.correct;
+                    opts += `<div class="bubble-opt ${isCorrect ? 'correct' : ''}"><strong>${letters[i]}.</strong> ${o} ${isCorrect ? '✓' : ''}</div>`;
+                });
+                
+                b.innerHTML = `
+                    <div class="bubble-q">${q.question}</div>
+                    <div class="bubble-opts">${opts}</div>
+                    <div class="bubble-exp"><strong>💡 Insight:</strong> ${q.explanation}</div>
+                `;
+                container.appendChild(b);
+            });
+        } catch (e) { container.innerHTML = 'Error loading.'; }
+    }
+
+    loadSidebar();
+</script>
+{% endblock %}
